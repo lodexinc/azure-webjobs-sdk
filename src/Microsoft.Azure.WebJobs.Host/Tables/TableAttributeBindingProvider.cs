@@ -43,8 +43,6 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
                 new StorageTableArgumentBindingProvider(),
                 new CloudTableArgumentBindingProvider(),
                 new QueryableArgumentBindingProvider(),
-                //new CollectorArgumentBindingProvider(),
-                //new AsyncCollectorArgumentBindingProvider(),
                 new TableArgumentBindingExtensionProvider(extensions));
 
             _entityBindingProvider =
@@ -188,20 +186,6 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
             IStorageTable table = tableClient.GetTableReference(attribute.TableName);
             return table;
         }
-
-        /*
-        private static IConverter<T, ITableEntity> c2 = PocoToTableEntityConverter<T>.Create();
-
-        private ITableEntity O2<T>(T source, TableAttribute attribute)
-        {
-            Type entityType = typeof(T);
-            if (TableClient.ImplementsOrEqualsITableEntity(entityType))
-            {
-                return (ITableEntity)(object)source;
-            } else {
-
-            }
-        }*/
 
         private ITableEntity ObjectToTableEntityConverterFunc(object source, TableAttribute attribute)
         {

@@ -669,7 +669,6 @@
     <Compile Include="Queues\StorageQueueMessageExtensions.cs" />
     <Compile Include="Queues\Triggers\StorageQueueMessageToCloudQueueMessageConverter.cs" />
     <Compile Include="Queues\Triggers\CloudQueueMessageToStorageQueueMessageConverter.cs" />
-    <Compile Include="Tables\AsyncCollectorArgumentBindingProvider.cs" />
     <Compile Include="Tables\ITableArgumentBinding.cs" />
     <Compile Include="Tables\IStorageTableArgumentBindingProvider.cs" />
     <Compile Include="Tables\ITableEntityArgumentBindingProvider.cs" />
@@ -716,7 +715,6 @@
     <Compile Include="Tables\Converters\NullableBooleanToEntityPropertyConverter.cs" />
     <Compile Include="Tables\Converters\BooleanToEntityPropertyConverter.cs" />
     <Compile Include="Tables\CloudQueueToStorageQueueConverter.cs" />
-    <Compile Include="Tables\CollectorArgumentBindingProvider.cs" />
     <Compile Include="Tables\EntityPropertyToTConverterFactory.cs" />
     <Compile Include="Tables\IStorageTableArgumentBinding.cs" />
     <Compile Include="Tables\PocoEntityValueBinder.cs" />
