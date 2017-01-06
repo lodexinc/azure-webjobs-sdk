@@ -970,6 +970,26 @@ namespace Microsoft.Azure.WebJobs.Host.FunctionalTests
         }
 
         [Fact]
+        public void Table_IfBoundToIAsyncCollectorLookalikeTableEntity_CanCall()
+        {
+            
+            TestTableBoundToCollectorCanCall(typeof(BindTableToIAsyncCollectorLookalikeTableEntity));
+        }
+
+        private class BindTableToIAsyncCollectorLookalikeTableEntity
+        {
+            public static Task Call([Table(TableName)] IAsyncCollector<PocoLookalikeTableEntity> table)
+            {
+                return table.AddAsync(new PocoLookalikeTableEntity
+                {
+                    PartitionKey = PartitionKey,
+                    RowKey = RowKey,
+                    Value = "123"
+                });
+            }
+        }
+
+        [Fact]
         public void Table_IfBoundToIAsyncCollectorITableEntity_CanCall()
         {
             TestTableBoundToCollectorCanCall(typeof(BindTableToIAsyncCollectorITableEntity));
@@ -1773,6 +1793,14 @@ namespace Microsoft.Azure.WebJobs.Host.FunctionalTests
 
         private class SdkTableEntity : TableEntity
         {
+            public string Value { get; set; }
+        }
+
+        // Not derived from ITableEntity, but structurally equivalent 
+        private class PocoLookalikeTableEntity
+        {
+            public string PartitionKey { get; set; }
+            public string RowKey { get; set; }
             public string Value { get; set; }
         }
 

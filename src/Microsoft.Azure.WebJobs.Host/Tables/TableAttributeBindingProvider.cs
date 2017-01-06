@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.WebJobs.Host.Bindings;
+using Microsoft.Azure.WebJobs.Host.Converters;
 using Microsoft.Azure.WebJobs.Host.Executors;
 using Microsoft.Azure.WebJobs.Host.Storage;
 using Microsoft.Azure.WebJobs.Host.Storage.Table;
@@ -42,8 +43,8 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
                 new StorageTableArgumentBindingProvider(),
                 new CloudTableArgumentBindingProvider(),
                 new QueryableArgumentBindingProvider(),
-                new CollectorArgumentBindingProvider(),
-                new AsyncCollectorArgumentBindingProvider(),
+                //new CollectorArgumentBindingProvider(),
+                //new AsyncCollectorArgumentBindingProvider(),
                 new TableArgumentBindingExtensionProvider(extensions));
 
             _entityBindingProvider =
@@ -68,12 +69,13 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
 
             return new ResolvedTableAttribute(attrResolved, client);
         }
-        
+
         public static IBindingProvider Build(INameResolver nameResolver, IConverterManager converterManager, IStorageAccountProvider accountProvider, IExtensionRegistry extensions)
         {
             var original = new TableAttributeBindingProvider(nameResolver, accountProvider, extensions);
 
             converterManager.AddConverter<JObject, ITableEntity, TableAttribute>(original.JObjectToTableEntityConverterFunc);
+            converterManager.AddConverter<object, ITableEntity, TableAttribute>(original.ObjectToTableEntityConverterFunc);
 
             var bindingFactory = new BindingFactory(nameResolver, converterManager);
             var bindAsyncCollector = bindingFactory.BindToAsyncCollector<TableAttribute, ITableEntity>(original.BuildFromTableAttribute, null, original.CollectAttributeInfo);
@@ -84,9 +86,10 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
             // Filter to just support JObject, and use legacy bindings for everything else. 
             // Once we have ITableEntity converters for pocos, we can remove the filter. 
             // https://github.com/Azure/azure-webjobs-sdk/issues/887
+            /*
             bindAsyncCollector = bindingFactory.AddFilter<TableAttribute>(
                 (attr, type) => (type == typeof(IAsyncCollector<JObject>) || type == typeof(ICollector<JObject>)), 
-                bindAsyncCollector); 
+                bindAsyncCollector); */
 
             var bindingProvider = new GenericCompositeBindingProvider<TableAttribute>(
                 new IBindingProvider[] { bindToJArray, bindToJobject, bindAsyncCollector, original });
@@ -184,6 +187,34 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
             var tableClient = ((ResolvedTableAttribute)attribute).Client;                           
             IStorageTable table = tableClient.GetTableReference(attribute.TableName);
             return table;
+        }
+
+        /*
+        private static IConverter<T, ITableEntity> c2 = PocoToTableEntityConverter<T>.Create();
+
+        private ITableEntity O2<T>(T source, TableAttribute attribute)
+        {
+            Type entityType = typeof(T);
+            if (TableClient.ImplementsOrEqualsITableEntity(entityType))
+            {
+                return (ITableEntity)(object)source;
+            } else {
+
+            }
+        }*/
+
+        private ITableEntity ObjectToTableEntityConverterFunc(object source, TableAttribute attribute)
+        {
+            ITableEntity ite = source as ITableEntity;
+            if (ite != null)
+            {
+                return ite;
+            }
+
+            var t = typeof(ITEConverter<>).MakeGenericType(source.GetType());
+            var c = (IConverter<object, ITableEntity>)Activator.CreateInstance(t);
+            ite = c.Convert(source);
+            return ite;
         }
 
         private ITableEntity JObjectToTableEntityConverterFunc(JObject source, TableAttribute attribute)
@@ -364,6 +395,16 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
             }
 
             internal IStorageTableClient Client { get; private set; }
+        }
+
+        private class ITEConverter<T> : IConverter<object, ITableEntity>
+        {
+            private static readonly IConverter<T, ITableEntity> Converter = PocoToTableEntityConverter<T>.Create();
+
+            public ITableEntity Convert(object item)
+            {
+                return Converter.Convert((T)item);
+            }
         }
     }
 }
