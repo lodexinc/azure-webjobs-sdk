@@ -81,20 +81,22 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
             var bindToJobject = bindingFactory.BindToExactAsyncType<TableAttribute, JObject>(original.BuildJObject, null, original.CollectAttributeInfo);
             var bindToJArray = bindingFactory.BindToExactAsyncType<TableAttribute, JArray>(original.BuildJArray, null, original.CollectAttributeInfo);
 
-            // Filter to just support JObject, and use legacy bindings for everything else. 
-            // Once we have ITableEntity converters for pocos, we can remove the filter. 
-            // https://github.com/Azure/azure-webjobs-sdk/issues/887
-            /*
-            bindAsyncCollector = bindingFactory.AddFilter<TableAttribute>(
-                (attr, type) => (type == typeof(IAsyncCollector<JObject>) || type == typeof(ICollector<JObject>)), 
-                bindAsyncCollector); */
-
             var bindingProvider = new GenericCompositeBindingProvider<TableAttribute>(
+                ValidateAttribute, nameResolver,
                 new IBindingProvider[] { bindToJArray, bindToJobject, bindAsyncCollector, original });
 
             return bindingProvider;
         }
-        
+
+        private static void ValidateAttribute(TableAttribute attribute, Type parameterType)
+        {
+            // Queue pre-existing  behavior: if there are { }in the path, then defer validation until runtime. 
+            if (!attribute.TableName.Contains("{"))
+            {
+                TableClient.ValidateAzureTableName(attribute.TableName);
+            }
+        }
+
         private async Task<JObject> BuildJObject(TableAttribute attribute)
         {
             IStorageTable table = GetTable(attribute);

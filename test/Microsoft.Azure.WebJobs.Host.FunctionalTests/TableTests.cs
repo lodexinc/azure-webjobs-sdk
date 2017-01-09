@@ -46,6 +46,7 @@ namespace Microsoft.Azure.WebJobs.Host.FunctionalTests
             Utility.AssertIndexingError<BadProgram3>("Run", "Table entity types must implement the property PartitionKey.");            
         }
 
+        /* $$$ Enabled now. 
         [Fact]
         public void Table_SingleOut_NotSupported()
         {
@@ -54,7 +55,7 @@ namespace Microsoft.Azure.WebJobs.Host.FunctionalTests
 
             Utility.AssertIndexingError<TableOutProgram>("Run", "Can't bind Table entity to type 'Microsoft.Azure.WebJobs.Host.FunctionalTests.TableTests+Poco&'.");
             Utility.AssertIndexingError<TableOutArrayProgram>("Run", "Can't bind Table entity to type 'Microsoft.Azure.WebJobs.Host.FunctionalTests.TableTests+Poco[]&'.");            
-        }
+        }*/
 
         // Helper to demonstrate that TableName property can include { } pairs. 
         private class BindToICollectorITableEntityResolvedTableProgram
