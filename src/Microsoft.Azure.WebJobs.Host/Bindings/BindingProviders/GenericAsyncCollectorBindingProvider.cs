@@ -140,7 +140,12 @@ namespace Microsoft.Azure.WebJobs.Host.Bindings
             public void AddConverter<TSource, TDestination, TAttribute1>(FuncConverter<TSource, TAttribute1, TDestination> converter) where TAttribute1 : Attribute
             {
                 throw new NotImplementedException();
-            }   
+            }
+
+            public void AddConverter2<TSrc, TDest, TAttribute1>(Func<Type, Func<object, object>> converterBuilder) where TAttribute1 : Attribute
+            {
+                throw new NotImplementedException();
+            }
 
             public FuncConverter<TSource, TAttribute1, TDestination> GetConverter<TSource, TDestination, TAttribute1>() where TAttribute1 : Attribute
             {

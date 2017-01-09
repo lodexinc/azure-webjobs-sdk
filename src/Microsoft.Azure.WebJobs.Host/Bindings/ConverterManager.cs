@@ -14,8 +14,9 @@ namespace Microsoft.Azure.WebJobs
     internal class ConverterManager : IConverterManager
     {
         // Map from <TSrc,TDest> to a converter function. 
-        private Dictionary<string, object> _funcsWithAttr = new Dictionary<string, object>();
-        
+        // (Type) --> FuncConverter<object, TAttribute, object>
+        private Dictionary<string, object> _funcsWithAttr = new Dictionary<string, object>();        
+
         public ConverterManager()
         {
             this.AddConverter<byte[], string>(DefaultByteArray2String);
@@ -32,15 +33,23 @@ namespace Microsoft.Azure.WebJobs
             return typeof(TSrc).FullName + "|" + typeof(TDest).FullName + "|" + typeof(TAttribute).FullName;
         }
 
+        public void AddConverter2<TSrc, TDest, TAttribute>(
+            Func<Type, Func<object, object>> converterBuilder)
+            where TAttribute : Attribute
+        {
+            string key = GetKey<TSrc, TDest, TAttribute>();
+            _funcsWithAttr[key] = converterBuilder;
+        }
+
         public void AddConverter<TSrc, TDest, TAttribute>(FuncConverter<TSrc, TAttribute, TDest> converter)
             where TAttribute : Attribute
-        {           
+        {
             string key = GetKey<TSrc, TDest, TAttribute>();
-            _funcsWithAttr[key] = converter;            
+            _funcsWithAttr[key] = converter;                        
         }
 
         // Return null if not found. 
-        private FuncConverter<TSrc, TAttribute, TDest> TryGetConverter<TSrc, TAttribute, TDest>()
+        private FuncConverter<TSrc, TAttribute, TDest> TryGetConverter<TSrc, TAttribute, TDest>(Type typeSrc = null)
             where TAttribute : Attribute
         {
             object obj;
@@ -49,13 +58,38 @@ namespace Microsoft.Azure.WebJobs
             string key1 = GetKey<TSrc, TDest, TAttribute>();
             if (_funcsWithAttr.TryGetValue(key1, out obj))
             {
+                var builder = obj as Func<Type, Func<object, object>>;
+                if (builder != null)
+                {
+                    Func<object, object> converter = builder(typeSrc); // converter 
+                    FuncConverter<TSrc, TAttribute, TDest> func3 = (input, attribute, context) =>
+                    {
+                        var output = converter(input);
+                        return (TDest)output;
+                    };
+                    return func3;
+                }
+
                 var func = (FuncConverter<TSrc, TAttribute, TDest>)obj;
                 return func;
             }
-                // No specific case, lookup in the general purpose case. 
+
+            // No specific case, lookup in the general purpose case. 
             string key2 = GetKey<TSrc, TDest, Attribute>();
             if (_funcsWithAttr.TryGetValue(key2, out obj))
             {
+                var builder = obj as Func<Type, Func<object, object>>;
+                if (builder != null)
+                {
+                    Func<object, object> converter = builder(typeSrc); // converter 
+                    FuncConverter<TSrc, TAttribute, TDest> func3 = (input, attribute, context) =>
+                    {
+                        var output = converter(input);
+                        return (TDest)output;
+                    };
+                    return func3;
+                }
+
                 var func1 = (FuncConverter<TSrc, Attribute, TDest>)obj;
                 FuncConverter<TSrc, TAttribute, TDest> func2 = (src, attr, context) => func1(src, null, context);
                 return func2;
@@ -77,9 +111,11 @@ namespace Microsoft.Azure.WebJobs
                 return exactMatch;
             }
 
+            var typeSource = typeof(TSrc);
+
             // Object --> TDest
             // Catch all for any conversion to TDest
-            var objConversion = TryGetConverter<object, TAttribute, TDest>();
+            var objConversion = TryGetConverter<object, TAttribute, TDest>(typeSource);
             if (objConversion != null)
             {
                 return (src, attr, context) =>

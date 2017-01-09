@@ -36,6 +36,17 @@ namespace Microsoft.Azure.WebJobs
         /// <param name="converter">the converter function for this combination of type parameters.</param>
         void AddConverter<TSource, TDestination, TAttribute>(FuncConverter<TSource, TAttribute, TDestination> converter)
             where TAttribute : Attribute;
+
+        /// <summary>
+        /// Add a converter.
+        /// </summary>
+        /// <typeparam name="TSrc"></typeparam>
+        /// <typeparam name="TDestination"></typeparam>
+        /// <typeparam name="TAttribute"></typeparam>
+        /// <param name="converterBuilder"></param>
+        void AddConverter2<TSrc, TDestination, TAttribute>(
+          Func<Type, Func<object, object>> converterBuilder)
+          where TAttribute : Attribute;
     }
 
     /// <summary>

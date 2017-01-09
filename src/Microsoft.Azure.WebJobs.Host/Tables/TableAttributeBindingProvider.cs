@@ -73,7 +73,7 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
             var original = new TableAttributeBindingProvider(nameResolver, accountProvider, extensions);
 
             converterManager.AddConverter<JObject, ITableEntity, TableAttribute>(original.JObjectToTableEntityConverterFunc);
-            converterManager.AddConverter<object, ITableEntity, TableAttribute>(original.ObjectToTableEntityConverterFunc);
+            converterManager.AddConverter2<object, ITableEntity, TableAttribute>(original.BuildITEConverter);
 
             var bindingFactory = new BindingFactory(nameResolver, converterManager);
             var bindAsyncCollector = bindingFactory.BindToAsyncCollector<TableAttribute, ITableEntity>(original.BuildFromTableAttribute, null, original.CollectAttributeInfo);
@@ -187,18 +187,30 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
             return table;
         }
 
-        private ITableEntity ObjectToTableEntityConverterFunc(object source, TableAttribute attribute)
+        // Build a converter function to convert from the given src type to an ITableEntity
+        // At runtime, input object to the converter function will be of type tSrc. 
+        private Func<object, object> BuildITEConverter(Type typeSource)
         {
-            ITableEntity ite = source as ITableEntity;
-            if (ite != null)
+            if (TableClient.ImplementsOrEqualsITableEntity(typeSource))
             {
-                return ite;
+                return (obj) => obj;
             }
 
-            var t = typeof(ITEConverter<>).MakeGenericType(source.GetType());
+            // JObject case should have been claimed by another converter. 
+            // So we can statically enforce an ITableEntity compatible contract
+            TableClient.VerifyContainsProperty(typeSource, "RowKey");
+            TableClient.VerifyContainsProperty(typeSource, "PartitionKey");
+
+            // Create a converter for this type once; and invoke each time. 
+            var t = typeof(ITEConverter<>).MakeGenericType(typeSource); // Helper
             var c = (IConverter<object, ITableEntity>)Activator.CreateInstance(t);
-            ite = c.Convert(source);
-            return ite;
+
+            Func<object, object> converter = (item) =>
+            {
+                ITableEntity entity = c.Convert(item);
+                return entity;
+            };
+            return converter;
         }
 
         private ITableEntity JObjectToTableEntityConverterFunc(JObject source, TableAttribute attribute)
