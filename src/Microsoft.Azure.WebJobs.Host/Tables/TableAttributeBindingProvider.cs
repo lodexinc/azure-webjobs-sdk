@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -9,6 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.Azure.WebJobs.Host.Bindings;
 using Microsoft.Azure.WebJobs.Host.Converters;
 using Microsoft.Azure.WebJobs.Host.Executors;
+using Microsoft.Azure.WebJobs.Host.Protocols;
 using Microsoft.Azure.WebJobs.Host.Storage;
 using Microsoft.Azure.WebJobs.Host.Storage.Table;
 using Microsoft.WindowsAzure.Storage.Table;
@@ -40,8 +42,6 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
             _accountProvider = accountProvider;
 
             _tableBindingProvider = new CompositeArgumentBindingProvider(
-                new StorageTableArgumentBindingProvider(),
-                new CloudTableArgumentBindingProvider(),
                 new QueryableArgumentBindingProvider(),
                 new TableArgumentBindingExtensionProvider(extensions));
 
@@ -76,16 +76,76 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
             converterManager.AddConverter2<object, ITableEntity, TableAttribute>(original.BuildITEConverter);
 
             var bindingFactory = new BindingFactory(nameResolver, converterManager);
-            var bindAsyncCollector = bindingFactory.BindToAsyncCollector<TableAttribute, ITableEntity>(original.BuildFromTableAttribute, null, original.CollectAttributeInfo);
 
-            var bindToJobject = bindingFactory.BindToExactAsyncType<TableAttribute, JObject>(original.BuildJObject, null, original.CollectAttributeInfo);
-            var bindToJArray = bindingFactory.BindToExactAsyncType<TableAttribute, JArray>(original.BuildJArray, null, original.CollectAttributeInfo);
+            var bindToExactCloudTable = bindingFactory.BindToExactAsyncType<TableAttribute, CloudTable>(
+                original.BindToCloudTable, 
+                original.ToParameterDescriptorForCollector, 
+                original.CollectAttributeInfo);
+
+            var bindToExactTestCloudTable = bindingFactory.BindToExactAsyncType<TableAttribute, IStorageTable>(
+                original.BindToTestCloudTable,
+                original.ToParameterDescriptorForCollector, 
+                original.CollectAttributeInfo);
+
+            var bindAsyncCollector = bindingFactory.BindToAsyncCollector<TableAttribute, ITableEntity>(
+                original.BuildFromTableAttribute, 
+                null, 
+                original.CollectAttributeInfo);
+
+            var bindToJobject = bindingFactory.BindToExactAsyncType<TableAttribute, JObject>(
+                original.BuildJObject, 
+                null, 
+                original.CollectAttributeInfo);
+
+            var bindToJArray = bindingFactory.BindToExactAsyncType<TableAttribute, JArray>(
+                original.BuildJArray, 
+                null, 
+                original.CollectAttributeInfo);
 
             var bindingProvider = new GenericCompositeBindingProvider<TableAttribute>(
                 ValidateAttribute, nameResolver,
-                new IBindingProvider[] { bindToJArray, bindToJobject, bindAsyncCollector, original });
+                new IBindingProvider[] 
+                {
+                    bindToJArray,
+                    bindToJobject,
+                    bindAsyncCollector,
+                    bindToExactCloudTable,
+                    bindToExactTestCloudTable,
+                    original
+                });
 
             return bindingProvider;
+        }
+
+        private ParameterDescriptor ToParameterDescriptorForCollector(TableAttribute attribute, ParameterInfo parameter, INameResolver nameResolver)
+        {
+            Task<IStorageAccount> t = Task.Run(() =>
+                _accountProvider.GetStorageAccountAsync(parameter, CancellationToken.None, nameResolver));
+            IStorageAccount account = t.GetAwaiter().GetResult();
+            string accountName = account.Credentials.AccountName;
+
+            return new TableParameterDescriptor
+            {
+                Name = parameter.Name,
+                AccountName = accountName,
+                TableName = Resolve(attribute.TableName),
+                Access = FileAccess.ReadWrite
+            };
+        }
+
+        private Task<IStorageTable> BindToTestCloudTable(TableAttribute attribute)
+        {
+            IStorageTable table = GetTable(attribute);
+            return Task.FromResult(table);
+        }
+
+        private async Task<CloudTable> BindToCloudTable(TableAttribute attribute)
+        {
+            IStorageTable table = GetTable(attribute);
+            await table.CreateIfNotExistsAsync(CancellationToken.None);
+
+            var sdkTable = table.SdkObject;
+            return sdkTable;
         }
 
         private static void ValidateAttribute(TableAttribute attribute, Type parameterType)
