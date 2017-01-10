@@ -42,7 +42,7 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
             _accountProvider = accountProvider;
 
             _tableBindingProvider = new CompositeArgumentBindingProvider(
-                new QueryableArgumentBindingProvider(),
+                //new QueryableArgumentBindingProvider(),
                 new TableArgumentBindingExtensionProvider(extensions));
 
             _entityBindingProvider =
@@ -51,7 +51,7 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
                 new PocoEntityArgumentBindingProvider()); // Supports all types; must come after other providers
         }
 
-        // [Table] has some pre-existing behavior where the storage account can be specified outside of the [Queue] attribute. 
+        // [Table] has some pre-existing behavior where the storage account can be specified outside of the [Table] attribute. 
         // The storage account is pulled from the ParameterInfo (which could pull in a [Storage] attribute on the container class)
         // Resolve everything back down to a single attribute so we can use the binding helpers. 
         // This pattern should be rare since other extensions can just keep everything directly on the primary attribute. 
@@ -75,46 +75,110 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
             converterManager.AddConverter<JObject, ITableEntity, TableAttribute>(original.JObjectToTableEntityConverterFunc);
             converterManager.AddConverter2<object, ITableEntity, TableAttribute>(original.BuildITEConverter);
 
+            // IStorageTable --> IQueryable<ITableEntity>
+            converterManager.AddConverter2<IStorageTable, TableQueryableOpenType, TableAttribute>(
+                original.QueryableConverter);
+
             var bindingFactory = new BindingFactory(nameResolver, converterManager);
 
             var bindToExactCloudTable = bindingFactory.BindToExactAsyncType<TableAttribute, CloudTable>(
-                original.BindToCloudTable, 
-                original.ToParameterDescriptorForCollector, 
+                original.BindToCloudTable,
+                original.ToParameterDescriptorForCollector,
                 original.CollectAttributeInfo);
 
-            var bindToExactTestCloudTable = bindingFactory.BindToExactAsyncType<TableAttribute, IStorageTable>(
+            // Includes converter manager, which provides access to IQueryable<ITableEntity>
+            var bindToExactTestCloudTable = bindingFactory.BindToExactAsyncType2<TableAttribute, IStorageTable>(
                 original.BindToTestCloudTable,
-                original.ToParameterDescriptorForCollector, 
+                original.ToParameterDescriptorForCollector,
                 original.CollectAttributeInfo);
 
             var bindAsyncCollector = bindingFactory.BindToAsyncCollector<TableAttribute, ITableEntity>(
-                original.BuildFromTableAttribute, 
-                null, 
+                original.BuildFromTableAttribute,
+                null,
                 original.CollectAttributeInfo);
 
             var bindToJobject = bindingFactory.BindToExactAsyncType<TableAttribute, JObject>(
-                original.BuildJObject, 
-                null, 
+                original.BuildJObject,
+                null,
                 original.CollectAttributeInfo);
 
             var bindToJArray = bindingFactory.BindToExactAsyncType<TableAttribute, JArray>(
-                original.BuildJArray, 
-                null, 
+                original.BuildJArray,
+                null,
                 original.CollectAttributeInfo);
+
+            //var bindToQueryable = bindingFactory.AddFilter<TableAttribute>(ParameterIsIQueryable,
+            //    bindingFactory.BindToGenericItem<TableAttribute>(original.BuildIQueryable)); $$$
 
             var bindingProvider = new GenericCompositeBindingProvider<TableAttribute>(
                 ValidateAttribute, nameResolver,
-                new IBindingProvider[] 
+                new IBindingProvider[]
                 {
+                    //AllowMultipleRows(bindingFactory, bindToQueryable),
+                    AllowMultipleRows(bindingFactory, bindAsyncCollector),
+                    AllowMultipleRows(bindingFactory, bindToExactCloudTable),
+                    AllowMultipleRows(bindingFactory, bindToExactTestCloudTable),
                     bindToJArray,
                     bindToJobject,
-                    bindAsyncCollector,
-                    bindToExactCloudTable,
-                    bindToExactTestCloudTable,
                     original
                 });
 
             return bindingProvider;
+        }
+
+        // Build a converter function that converts from:
+        //  IStorageTable --> IQueryable<T> where T : ITableEntity
+        private Func<object, object> QueryableConverter(Type typeSource, Type typeDest)
+        {            
+            // Already verified that typeDest is IQueryable<T> where T is derived from ITableEntity
+            Type entityType = GetQueryableItemType(typeDest);
+
+            var method = this.GetType().GetMethod("BuildIQueryable", BindingFlags.Static | BindingFlags.NonPublic);
+            var method2 = method.MakeGenericMethod(entityType);
+
+            Func<object, object> converter = (input) =>
+                 {
+                     var resultTask = method2.Invoke(null, new object[] { input });
+                     return resultTask;
+                 };
+            return converter;
+        }
+
+        private static object BuildIQueryable<TElement>(IStorageTable value)
+            where TElement : ITableEntity, new()
+        {
+            // If Table does not exist, treat it like have zero rows. 
+            // This means return an non-null but empty enumerable.
+            // SDK doesn't do that, so we need to explicitly check. 
+
+            IQueryable<TElement> queryable;
+
+            Task<bool> t = Task.Run(() => value.ExistsAsync(CancellationToken.None));
+            bool exists = t.GetAwaiter().GetResult();
+
+            if (!exists)
+            {
+                queryable = Enumerable.Empty<TElement>().AsQueryable();
+            }
+            else
+            {
+                queryable = value.CreateQuery<TElement>();
+            }
+
+            return queryable;
+        }
+
+        private static Type GetQueryableItemType(Type queryableType)
+        {
+            Type[] genericArguments = queryableType.GetGenericArguments();
+            var itemType = genericArguments[0];
+            return itemType;
+        }
+   
+        // Binding rule only allowed on attributes that don't specify the RowKey. 
+        private static IBindingProvider AllowMultipleRows(BindingFactory bf, IBindingProvider innerProvider)
+        {
+            return bf.AddFilter<TableAttribute>((attr, type) => attr.RowKey == null, innerProvider);
         }
 
         private ParameterDescriptor ToParameterDescriptorForCollector(TableAttribute attribute, ParameterInfo parameter, INameResolver nameResolver)
@@ -251,7 +315,7 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
 
         // Build a converter function to convert from the given src type to an ITableEntity
         // At runtime, input object to the converter function will be of type tSrc. 
-        private Func<object, object> BuildITEConverter(Type typeSource)
+        private Func<object, object> BuildITEConverter(Type typeSource, Type typeDest)
         {
             if (TableClient.ImplementsOrEqualsITableEntity(typeSource))
             {
@@ -462,6 +526,20 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
             public ITableEntity Convert(object item)
             {
                 return Converter.Convert((T)item);
+            }
+        }
+
+        // Matches IQueryable<T> where T is derived from ITableEntity
+        private class TableQueryableOpenType : OpenType
+        {
+            public static bool IsValid(Type t)
+            {
+                if (!t.IsGenericType ||
+                    t.GetGenericTypeDefinition() != typeof(IQueryable<>))
+                {
+                    return false;
+                }
+                return true;
             }
         }
     }

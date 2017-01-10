@@ -176,7 +176,36 @@ namespace Microsoft.Azure.WebJobs.Host.Bindings
             Func<TAttribute, ParameterInfo, INameResolver, Task<TAttribute>> postResolveHook = null)
             where TAttribute : Attribute
         {
-            var bindingProvider = new ExactTypeBindingProvider<TAttribute, TUserType>(_nameResolver, buildFromAttribute, buildParameterDescriptor, postResolveHook);
+            var bindingProvider = new ExactTypeBindingProvider<TAttribute, TUserType>(
+                _nameResolver, 
+                buildFromAttribute,
+                null,
+                buildParameterDescriptor, 
+                postResolveHook);
+            return bindingProvider;
+        }
+
+        /// <summary>
+        /// Create a binding provider that binds the parameter to a set of possible types via converter manager. 
+        /// </summary>
+        /// <typeparam name="TAttribute">type of binding attribute on the user's parameter.</typeparam>
+        /// <typeparam name="TUserType">The exact type of the user's parameter that this will bind to.</typeparam>
+        /// <param name="buildFromAttribute">builder function to create the object that will get passed to the user function.</param>
+        /// <param name="buildParameterDescriptor">An optional function to create a specific ParameterDescriptor object for the dashboard. If missing, a default ParameterDescriptor is created. </param>
+        /// <param name="postResolveHook">an advanced hook for translating the attribute. </param>
+        /// <returns>A binding provider that applies these semantics.</returns>
+        public IBindingProvider BindToExactAsyncType2<TAttribute, TUserType>(
+            Func<TAttribute, Task<TUserType>> buildFromAttribute,
+            Func<TAttribute, ParameterInfo, INameResolver, ParameterDescriptor> buildParameterDescriptor = null,
+            Func<TAttribute, ParameterInfo, INameResolver, Task<TAttribute>> postResolveHook = null)
+            where TAttribute : Attribute
+        {
+            var bindingProvider = new ExactTypeBindingProvider<TAttribute, TUserType>(
+                _nameResolver, 
+                buildFromAttribute, 
+                _converterManager, 
+                buildParameterDescriptor, 
+                postResolveHook);
             return bindingProvider;
         }
 

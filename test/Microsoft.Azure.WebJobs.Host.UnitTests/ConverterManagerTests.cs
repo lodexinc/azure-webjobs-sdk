@@ -197,6 +197,49 @@ namespace Microsoft.Azure.WebJobs.Host.UnitTests
             Assert.Equal("[common:x]", x2);
         }
 
+        [Fact]
+        public void OpenType()
+        {
+            int count = 0;
+            var cm = new ConverterManager();
+
+            // Register a converter builder. 
+            // Builder runs once; converter runs each time.
+            // Uses open type to match. 
+            cm.AddConverter2<TypeWrapper<string>, int, Attribute>(
+                (typeSrc, typeDest) =>
+                {
+                    count++;
+                    Assert.Equal(typeof(String), typeSrc);
+                    Assert.Equal(typeof(int), typeDest);
+
+                    return (input) =>
+                    {
+                        string s = (string)input;
+                        return int.Parse(s);
+                    };
+                });
+
+            var converter = cm.GetConverter<string, int, Attribute>();
+
+            Assert.Equal(12, converter("12", new TestAttribute(null), null));
+            Assert.Equal(34, converter("34", new TestAttribute(null), null));            
+
+            Assert.Equal(1, count); // converterBuilder is only called once. 
+
+            // 'char' as src parameter doesn't match the type predicate. 
+            Assert.Null(cm.GetConverter<char, int, Attribute>());
+        }
+
+        class TypeWrapper<T> : OpenType
+        {
+            // Predicate is invoked by ConverterManager to determine if a type matches. 
+            public static bool IsValid(Type t)
+            {
+                return t == typeof(T);
+            }
+        }
+
         // Custom type
         public class Wrapper
         {
