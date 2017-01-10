@@ -206,7 +206,7 @@ namespace Microsoft.Azure.WebJobs.Host.UnitTests
             // Register a converter builder. 
             // Builder runs once; converter runs each time.
             // Uses open type to match. 
-            cm.AddConverter2<TypeWrapper<string>, int, Attribute>(
+            cm.AddConverterBuilder<TypeWrapper<string>, int, Attribute>(
                 (typeSrc, typeDest) =>
                 {
                     count++;
@@ -229,7 +229,7 @@ namespace Microsoft.Azure.WebJobs.Host.UnitTests
 
             // 'char' as src parameter doesn't match the type predicate. 
             Assert.Null(cm.GetConverter<char, int, Attribute>());
-        }
+        }  
 
         class TypeWrapper<T> : OpenType
         {

@@ -38,13 +38,16 @@ namespace Microsoft.Azure.WebJobs
             where TAttribute : Attribute;
 
         /// <summary>
-        /// Add a converter. $$$
+        /// Add a builder function that returns a converter. This can use <see cref="Microsoft.Azure.WebJobs.Host.Bindings.OpenType"/>  to match against an 
+        /// open set of types. The builder can then do one time static type checking and code gen caching before
+        /// returning a converter function that is called on each invocation. 
         /// </summary>
-        /// <typeparam name="TSrc"></typeparam>
-        /// <typeparam name="TDestination"></typeparam>
-        /// <typeparam name="TAttribute"></typeparam>
-        /// <param name="converterBuilder"></param>
-        void AddConverter2<TSrc, TDestination, TAttribute>(
+        /// <typeparam name="TSource">Source type.</typeparam>
+        /// <typeparam name="TDestination">Destination type.</typeparam>
+        /// <typeparam name="TAttribute">Attribute on the binding. </typeparam>
+        /// <param name="converterBuilder">A function that is invoked if-and-only-if there is a compatible type match for the 
+        /// source and destination types. It then produce a converter function that can be called many times </param>
+        void AddConverterBuilder<TSource, TDestination, TAttribute>(
           Func<Type, Type, Func<object, object>> converterBuilder)
           where TAttribute : Attribute;
     }

@@ -73,10 +73,10 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
             var original = new TableAttributeBindingProvider(nameResolver, accountProvider, extensions);
 
             converterManager.AddConverter<JObject, ITableEntity, TableAttribute>(original.JObjectToTableEntityConverterFunc);
-            converterManager.AddConverter2<object, ITableEntity, TableAttribute>(original.BuildITEConverter);
+            converterManager.AddConverterBuilder<object, ITableEntity, TableAttribute>(original.BuildITEConverter);
 
             // IStorageTable --> IQueryable<ITableEntity>
-            converterManager.AddConverter2<IStorageTable, TableQueryableOpenType, TableAttribute>(
+            converterManager.AddConverterBuilder<IStorageTable, TableQueryableOpenType, TableAttribute>(
                 original.QueryableConverter);
 
             var bindingFactory = new BindingFactory(nameResolver, converterManager);
@@ -107,14 +107,10 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
                 null,
                 original.CollectAttributeInfo);
 
-            //var bindToQueryable = bindingFactory.AddFilter<TableAttribute>(ParameterIsIQueryable,
-            //    bindingFactory.BindToGenericItem<TableAttribute>(original.BuildIQueryable)); $$$
-
             var bindingProvider = new GenericCompositeBindingProvider<TableAttribute>(
                 ValidateAttribute, nameResolver,
                 new IBindingProvider[]
                 {
-                    //AllowMultipleRows(bindingFactory, bindToQueryable),
                     AllowMultipleRows(bindingFactory, bindAsyncCollector),
                     AllowMultipleRows(bindingFactory, bindToExactCloudTable),
                     AllowMultipleRows(bindingFactory, bindToExactTestCloudTable),

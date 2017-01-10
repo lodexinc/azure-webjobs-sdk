@@ -46,16 +46,24 @@ namespace Microsoft.Azure.WebJobs.Host.FunctionalTests
             Utility.AssertIndexingError<BadProgram3>("Run", "Table entity types must implement the property PartitionKey.");            
         }
 
-        /* $$$ Enabled now. 
-        [Fact]
-        public void Table_SingleOut_NotSupported()
+        class BindToSingleOutProgram
         {
-            // Not supported. This is inconsistent with the rest of the IAsyncCollector pattern
-            // Tracked by: https://github.com/Azure/azure-webjobs-sdk/issues/790
+            public static void Run([Table(TableName)] out Poco x)
+            {
+                x = new Poco { PartitionKey = PartitionKey, RowKey = RowKey, Property = "1234" };
+            }
+        }
 
-            Utility.AssertIndexingError<TableOutProgram>("Run", "Can't bind Table entity to type 'Microsoft.Azure.WebJobs.Host.FunctionalTests.TableTests+Poco&'.");
-            Utility.AssertIndexingError<TableOutArrayProgram>("Run", "Can't bind Table entity to type 'Microsoft.Azure.WebJobs.Host.FunctionalTests.TableTests+Poco[]&'.");            
-        }*/
+        [Fact]
+        public void Table_SingleOut_Supported()
+        {
+            IStorageAccount account = new FakeStorageAccount();
+            var host = TestHelpers.NewJobHost<BindToSingleOutProgram>(account);
+
+            host.Call("Run");
+
+            AssertStringProperty(account, "Property", "1234");
+        }
 
         // Helper to demonstrate that TableName property can include { } pairs. 
         private class BindToICollectorITableEntityResolvedTableProgram

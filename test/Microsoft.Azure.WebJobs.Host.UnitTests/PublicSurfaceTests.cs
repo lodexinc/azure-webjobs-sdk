@@ -159,6 +159,7 @@ namespace Microsoft.Azure.WebJobs.Host.UnitTests
                 "BindingProviderContext",
                 "BindingTemplate",
                 "BindStepOrder",
+                "OpenType",
                 "FunctionBindingContext",
                 "IBinding",
                 "IBindingProvider",

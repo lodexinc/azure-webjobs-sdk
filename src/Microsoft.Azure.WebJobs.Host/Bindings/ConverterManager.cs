@@ -60,7 +60,8 @@ namespace Microsoft.Azure.WebJobs
             var method = t.GetMethod("IsValid", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
             if (method == null)
             {
-                throw new InvalidOperationException("Type " + t.FullName + "' error"); // $$$ 
+                throw new InvalidOperationException("Type " + t.FullName + "' is derived from " + typeof(OpenType).Name + " but is missing an " 
+                    + "IsValid()" + " method");
             }
 
             var func = (Func<Type, bool>)method.CreateDelegate(typeof(Func<Type, bool>));
@@ -93,7 +94,7 @@ namespace Microsoft.Azure.WebJobs
             return typeof(TSrc).FullName + "|" + typeof(TDest).FullName + "|" + typeof(TAttribute).FullName;
         }
 
-        public void AddConverter2<TSrc, TDest, TAttribute>(
+        public void AddConverterBuilder<TSrc, TDest, TAttribute>(
             Func<Type, Type, Func<object, object>> converterBuilder)
             where TAttribute : Attribute
         {
@@ -292,7 +293,7 @@ namespace Microsoft.Azure.WebJobs
                 throw new NotImplementedException();
             }
 
-            public void AddConverter2<TSrc, TDest, TAttribute1>(Func<Type, Type, Func<object, object>> converterBuilder) where TAttribute1 : Attribute
+            public void AddConverterBuilder<TSrc, TDest, TAttribute1>(Func<Type, Type, Func<object, object>> converterBuilder) where TAttribute1 : Attribute
             {
                 throw new NotImplementedException();
             }
