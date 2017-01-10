@@ -20,7 +20,6 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
 {
     internal class TableAttributeBindingProvider : IBindingProvider
     {
-        private readonly IStorageTableArgumentBindingProvider _tableBindingProvider;
         private readonly ITableEntityArgumentBindingProvider _entityBindingProvider;
 
         private readonly INameResolver _nameResolver;
@@ -40,8 +39,6 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
 
             _nameResolver = nameResolver;
             _accountProvider = accountProvider;
-
-            _tableBindingProvider = new CompositeArgumentBindingProvider();
 
             _entityBindingProvider =
                 new CompositeEntityArgumentBindingProvider(
@@ -365,18 +362,10 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
 
             if (bindsToEntireTable)
             {
-                IBindableTablePath path = BindableTablePath.Create(tableName);
-                path.ValidateContractCompatibility(context.BindingDataContract);
-
-                IStorageTableArgumentBinding argumentBinding = _tableBindingProvider.TryCreate(parameter);
-
-                if (argumentBinding == null)
-                {
-                    throw new InvalidOperationException("Can't bind Table to type '" + parameter.ParameterType + "'.");
-                }
-
-                binding = new TableBinding(parameter.Name, argumentBinding, client, path);
-            }
+                // This should have been caught by the other rule-based binders. 
+                // We never except this to get thrown. 
+                throw new InvalidOperationException("Can't bind Table to type '" + parameter.ParameterType + "'.");
+            }            
             else
             {
                 string partitionKey = Resolve(tableAttribute.PartitionKey);
