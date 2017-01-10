@@ -8,19 +8,21 @@ using Microsoft.Azure.WebJobs.Host.Protocols;
 
 namespace Microsoft.Azure.WebJobs.Host.Bindings
 {
-    // BindingProvider to bind to an exact type. Useful for binding to a client object. 
-    internal class ExactTypeBindingProvider<TAttribute, TUserType> : IBindingProvider
+    // BindingProvider to bind to type. It can user Converter manager to convert from TMiddleType to the user
+    // parameter's exact type. 
+    // Useful for binding to a client object. 
+    internal class ExactTypeBindingProvider<TAttribute, TMiddleType> : IBindingProvider
         where TAttribute : Attribute
     {
         private readonly INameResolver _nameResolver;
         private readonly IConverterManager _converterManager;
-        private readonly Func<TAttribute, Task<TUserType>> _buildFromAttr;
+        private readonly Func<TAttribute, Task<TMiddleType>> _buildFromAttr;
         private readonly Func<TAttribute, ParameterInfo, INameResolver, ParameterDescriptor> _buildParameterDescriptor;
         private readonly Func<TAttribute, ParameterInfo, INameResolver, Task<TAttribute>> _postResolveHook;
 
         public ExactTypeBindingProvider(
             INameResolver nameResolver,
-            Func<TAttribute, Task<TUserType>> buildFromAttr,
+            Func<TAttribute, Task<TMiddleType>> buildFromAttr,
             IConverterManager converterManager = null,
             Func<TAttribute, ParameterInfo, INameResolver, ParameterDescriptor> buildParameterDescriptor = null,
             Func<TAttribute, ParameterInfo, INameResolver, Task<TAttribute>> postResolveHook = null)
@@ -47,7 +49,7 @@ namespace Microsoft.Azure.WebJobs.Host.Bindings
                 return Task.FromResult<IBinding>(null);
             }
 
-            var type = typeof(ExactBinding<>).MakeGenericType(typeof(TAttribute), typeof(TUserType), typeFinal);
+            var type = typeof(ExactBinding<>).MakeGenericType(typeof(TAttribute), typeof(TMiddleType), typeFinal);
             var method = type.GetMethod("TryBuild", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
             var binding = (IBinding)method.Invoke(null, new object[] { this, context });
 
@@ -56,14 +58,14 @@ namespace Microsoft.Azure.WebJobs.Host.Bindings
 
         private class ExactBinding<TFinalType> : BindingBase<TAttribute>
         {
-            private readonly Func<TAttribute, Task<TUserType>> _buildFromAttr;
-            private readonly FuncConverter<TUserType, TAttribute, TFinalType> _converter;
+            private readonly Func<TAttribute, Task<TMiddleType>> _buildFromAttr;
+            private readonly FuncConverter<TMiddleType, TAttribute, TFinalType> _converter;
 
             public ExactBinding(
                 AttributeCloner<TAttribute> cloner,
                 ParameterDescriptor param,
-                Func<TAttribute, Task<TUserType>> buildFromAttr,
-                FuncConverter<TUserType, TAttribute, TFinalType> converter)
+                Func<TAttribute, Task<TMiddleType>> buildFromAttr,
+                FuncConverter<TMiddleType, TAttribute, TFinalType> converter)
                 : base(cloner, param)
             {
                 _buildFromAttr = buildFromAttr;
@@ -71,7 +73,7 @@ namespace Microsoft.Azure.WebJobs.Host.Bindings
             }
 
             public static ExactBinding<TFinalType> TryBuild(
-                ExactTypeBindingProvider<TAttribute, TUserType> parent,
+                ExactTypeBindingProvider<TAttribute, TMiddleType> parent,
                 BindingProviderContext context)
             {
                 var parameter = context.Parameter;
@@ -83,7 +85,7 @@ namespace Microsoft.Azure.WebJobs.Host.Bindings
                 }
 
                 // Only apply this rule if we can convert to the user's type. 
-                FuncConverter<TUserType, TAttribute, TFinalType> converter = parent._converterManager.GetConverter<TUserType, TFinalType, TAttribute>();
+                FuncConverter<TMiddleType, TAttribute, TFinalType> converter = parent._converterManager.GetConverter<TMiddleType, TFinalType, TAttribute>();
                 if (converter == null)
                 {
                     return null;

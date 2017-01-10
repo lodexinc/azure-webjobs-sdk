@@ -76,13 +76,13 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
 
             var bindingFactory = new BindingFactory(nameResolver, converterManager);
 
-            var bindToExactCloudTable = bindingFactory.BindToExactAsyncType2<TableAttribute, CloudTable>(
+            var bindToExactCloudTable = bindingFactory.BindToGeneralAsyncType<TableAttribute, CloudTable>(
                 original.BindToCloudTable,
                 original.ToParameterDescriptorForCollector,
                 original.CollectAttributeInfo);
 
             // Includes converter manager, which provides access to IQueryable<ITableEntity>
-            var bindToExactTestCloudTable = bindingFactory.BindToExactAsyncType2<TableAttribute, IStorageTable>(
+            var bindToExactTestCloudTable = bindingFactory.BindToGeneralAsyncType<TableAttribute, IStorageTable>(
                 original.BindToTestCloudTable,
                 original.ToParameterDescriptorForCollector,
                 original.CollectAttributeInfo);
