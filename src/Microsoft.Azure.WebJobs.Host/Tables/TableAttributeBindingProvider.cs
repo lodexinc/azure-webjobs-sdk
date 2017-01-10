@@ -41,9 +41,7 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
             _nameResolver = nameResolver;
             _accountProvider = accountProvider;
 
-            _tableBindingProvider = new CompositeArgumentBindingProvider(
-                //new QueryableArgumentBindingProvider(),
-                new TableArgumentBindingExtensionProvider(extensions));
+            _tableBindingProvider = new CompositeArgumentBindingProvider();
 
             _entityBindingProvider =
                 new CompositeEntityArgumentBindingProvider(
@@ -81,7 +79,7 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
 
             var bindingFactory = new BindingFactory(nameResolver, converterManager);
 
-            var bindToExactCloudTable = bindingFactory.BindToExactAsyncType<TableAttribute, CloudTable>(
+            var bindToExactCloudTable = bindingFactory.BindToExactAsyncType2<TableAttribute, CloudTable>(
                 original.BindToCloudTable,
                 original.ToParameterDescriptorForCollector,
                 original.CollectAttributeInfo);
@@ -535,6 +533,17 @@ namespace Microsoft.Azure.WebJobs.Host.Tables
                 {
                     return false;
                 }
+
+                // We're now commited to an IQueryable. Verify other constraints. 
+                Type entityType = GetQueryableItemType(t);
+
+                if (!TableClient.ImplementsITableEntity(entityType))
+                {
+                    throw new InvalidOperationException("IQueryable is only supported on types that implement ITableEntity.");
+                }
+
+                TableClient.VerifyDefaultConstructor(entityType);
+
                 return true;
             }
         }

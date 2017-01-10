@@ -10,7 +10,7 @@ namespace Microsoft.Azure.WebJobs.Host.TestCommon
 {
     public class TestJobHost<TProgram> : JobHost
     {
-        internal TestJobHost(IServiceProvider serviceProvider)
+        public TestJobHost(IServiceProvider serviceProvider)
             : base(serviceProvider)
         {
         }
